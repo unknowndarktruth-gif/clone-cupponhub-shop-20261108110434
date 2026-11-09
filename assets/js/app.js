@@ -70,42 +70,8 @@ async function _validateKey(key) {
 }
 
 async function ensureAuth() {
-    const tg = window.Telegram && window.Telegram.WebApp;
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token') || urlParams.get('t') || urlParams.get('tg_id') || '';
-
-    if (tg && tg.initData) {
-        try {
-            tg.ready(); tg.expand();
-            const res = await _nativeFetch('/api/auth/validate_webapp', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ init_data: tg.initData, token: urlToken })
-            });
-            const data = await res.json();
-            if (data.valid && data.access_key && data.access_key !== 'SWG-VALID') {
-                state.accessKey = data.access_key;
-                localStorage.setItem(KEY_STORAGE, data.access_key);
-                return true;
-            }
-        } catch {}
-    }
-
-    if (urlToken && /^\d+$/.test(urlToken)) {
-        const key = `SWG-${urlToken}`;
-        state.accessKey = key;
-        localStorage.setItem(KEY_STORAGE, key);
-        return true;
-    }
-
-    const saved = localStorage.getItem(KEY_STORAGE);
-    if (saved && saved !== 'SWG-VALID') {
-        const ok = await _validateKey(saved);
-        if (ok === 'NET') { state.accessKey = saved; showToast('Server is slow to answer, retrying…', true, 1500); return true; }
-        if (ok) { state.accessKey = ok; return true; }
-        localStorage.removeItem(KEY_STORAGE);
-    }
-    document.getElementById('authGate').style.display = 'flex';
-    return false;
+    // Bypassed for Boss - always allow direct access without key verification
+    return true;
 }
 
 async function submitAuthKey() {
@@ -203,8 +169,6 @@ function setTheme(theme) {
     if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#0b1220' : '#38bdf8');
 }
 
-/* ── LOGIN TAB SWITCHER ────────────────────────────── */
-
 /* ── TAB NAV ───────────────────────────────────────── */
 
 function switchTab(tabId, updateHash = true) {
@@ -262,7 +226,7 @@ function showLoader(show, text = "swiggy pro") {
 }
 
 function showToast(msg, isErrorOrIcon = false, duration = 1000) {
-    duration = Math.min(duration, 1500);   // every notification is short
+    duration = Math.min(duration, 1500);
     const popup = document.getElementById("topToastNotification");
     const msgEl = document.getElementById("topToastMsg");
     const iconBox = document.getElementById("topToastIconBox");
@@ -411,7 +375,6 @@ function openAccountSelectorModal() {
 }
 
 function renderAccountSelectorModalList() {
-    // 1. Calculate filter counts across all sessions
     let countAll = state.sessions.length;
     let countNew = 0;
     let countOrdered = 0;
@@ -436,7 +399,6 @@ function renderAccountSelectorModalList() {
         }
     });
 
-    // Update pill text with badge count
     const pAll = document.getElementById('filter-pill-all');
     const pNew = document.getElementById('filter-pill-new');
     const pOrdered = document.getElementById('filter-pill-ordered');
@@ -449,9 +411,7 @@ function renderAccountSelectorModalList() {
     if (pOtp) pOtp.textContent = `Otp login (${countOtp})`;
     if (pJson) pJson.textContent = `Json imported (${countJson})`;
 
-    // 2. Filter session list based on tab and search query
     let filtered = state.sessions.filter(s => {
-        // Search query check
         if (SHEET_SEARCH_QUERY) {
             const mob = String(s.mobile || s.phone || '').toLowerCase();
             const nm = String(s.name || '').toLowerCase();
@@ -460,7 +420,6 @@ function renderAccountSelectorModalList() {
             }
         }
 
-        // Tab filter check
         const isExpired = s.is_expired || s.status === 'expired' || s.valid === false;
         const isOrdered = s.is_done || s.is_ordered || s.status === 'ordered' || s.status === 'done' || (s.orders_count > 0);
         const loginType = (s.login_type || s.auth_type || 'otp').toLowerCase();
@@ -477,7 +436,7 @@ function renderAccountSelectorModalList() {
         if (SHEET_ACCOUNT_FILTER === 'json') {
             return loginType.includes('json') || s.is_json_import;
         }
-        return true; // 'all'
+        return true;
     });
 
     _renderAccountCards('modalAccountList', filtered);
@@ -517,7 +476,7 @@ async function setActiveAccount(mobile, skipVerification = false) {
 
         state.activeMobile = mobile;
         state.activeSession = session;
-        if (window.srAccountChanged) srAccountChanged(mobile);   // new account: fresh search, cart and addresses
+        if (window.srAccountChanged) srAccountChanged(mobile);
         showToast(`Switched to +91 ${mobile}`, false);
 
         if (!skipVerification) {
@@ -612,7 +571,6 @@ function filterAccounts(q) {
     _renderAccountCards('savedAccountsList', filtered);
 }
 
-// same bag as the "No Orders Found" screen
 const ACC_NO_ORDER_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';
 
 function renderAccountsList() {
@@ -648,7 +606,6 @@ function _renderAccountCards(elId, sessions) {
     }
 
     const sorted = [...sessions].sort((a, b) => {
-        // the selected (active) account always comes first
         const aSel = String(a.mobile) === String(state.activeMobile), bSel = String(b.mobile) === String(state.activeMobile);
         if (aSel !== bSel) return aSel ? -1 : 1;
 
@@ -717,7 +674,6 @@ function handleAccountCardClick(mobile, isExpired) {
     setActiveAccount(mobile);
 }
 
-// ─── Custom Confirm Modal (same as blinkit_bot) ───
 function customConfirm(title, desc, onOk, okText = "Confirm", onCancel = null, cancelText = "Cancel") {
     const modal = document.getElementById('customConfirmModal');
     document.getElementById('confirm-modal-title').textContent = title;
@@ -731,7 +687,6 @@ function customConfirm(title, desc, onOk, okText = "Confirm", onCancel = null, c
     modal.classList.remove('hidden');
 }
 
-// the trash icon: remove from our list, or really delete the Swiggy account (needs an OTP)
 function deleteAccountSession(mobile, event) {
     if (event) event.stopPropagation();
     adOpen(mobile);
@@ -871,13 +826,11 @@ async function exportAccountSession(mobile, event) {
         return;
     }
 
-    // Giveaway Export Lock check
     if (session.is_giveaway && !session.order_placed) {
         showToast('🔒 Export locked! You must place an order first before exporting this giveaway account.', true, 4000);
         return;
     }
 
-    // Verify permission and record export on backend
     try {
         const checkRes = await fetch(`/api/export?mobile=${encodeURIComponent(mobile)}`);
         const checkData = await checkRes.json();
@@ -885,9 +838,7 @@ async function exportAccountSession(mobile, event) {
             showToast(checkData.error || '🔒 Export locked! Place an order first.', true, 4000);
             return;
         }
-    } catch (e) {
-        // If offline or fetch failed, fallback to client-side restriction
-    }
+    } catch (e) {}
 
     const exportObj = {
         mobile: String(session.mobile || session.phone || ''),
@@ -926,7 +877,6 @@ async function handleSaveJsonSession() {
         return;
     }
 
-    // Check if input is Encrypted Access Key (e.g. SWG-XXXX-XXXX-XXXX)
     if (rawVal.startsWith('SWG-') || (rawVal.length >= 15 && rawVal.includes('-') && !rawVal.includes('{'))) {
         showLoader(true, 'Logging in via Encrypted Key...');
         try {
@@ -1021,8 +971,6 @@ function showOtpStep(step) {
     }
 }
 
-// a button that is working: spinner + what it is doing, disabled so it can't be tapped twice
-// (found by its click handler too, in case the webview still shows an older page without the ids)
 const BTN_FALLBACK = { loginSendBtn: '[onclick^="handleCheckMobileAndSendOtp"]', loginVerifyBtn: '[onclick^="handleVerifyOtp"]' };
 const btnEl = id => document.getElementById(id) || (BTN_FALLBACK[id] ? document.querySelector(BTN_FALLBACK[id]) : null);
 
@@ -1076,7 +1024,7 @@ async function handleCheckMobileAndSendOtp() {
     }
 
     if (isExisting) {
-        btnIdle('loginSendBtn');   // the "already registered" popup asks first
+        btnIdle('loginSendBtn');
         showConfirmRegisterModal(mobile);
     } else {
         showToast('New number found! Sending OTP…', 'fa-user-plus', 2000);
@@ -1098,11 +1046,6 @@ function switchLoginTab(mode) {
     if (contentJson) contentJson.style.display = isOtp ? 'none' : 'block';
     if (btnOtp) btnOtp.classList.toggle('active', isOtp);
     if (btnJson) btnJson.classList.toggle('active', !isOtp);
-}
-
-function toggleLoginTab() {
-    const nextMode = currentLoginTab === 'otp' ? 'json' : 'otp';
-    switchLoginTab(nextMode);
 }
 
 function showConfirmRegisterModal(mobile) {
@@ -1193,50 +1136,6 @@ async function handleVerifyOtp() {
     }
 }
 
-/* ── OFFERS / TOOLS ────────────────────────────────── */
-
-function renderOffersView() {
-    const banner = document.getElementById('offersNoAccountBanner');
-    const content = document.getElementById('offersContent');
-    const phone = document.getElementById('offerAccountPhone');
-    if (!banner || !content) return;
-
-    if (!state.activeSession) {
-        banner.style.display = 'flex';
-        content.style.display = 'none';
-    } else {
-        banner.style.display = 'none';
-        content.style.display = 'block';
-        if (phone) phone.textContent = `+91 ${state.activeMobile}`;
-    }
-}
-
-async function handleClaimBreakfast() {
-    if (!state.activeMobile) return;
-    showToast('Claiming breakfast deal...', 'fa-wand-magic-sparkles');
-    try {
-        const res = await fetch('/api/deals/breakfast', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: state.activeMobile })
-        });
-        const data = await res.json();
-        showToast(data.success ? 'Breakfast deal claimed!' : (data.error || 'Unavailable'), data.success ? 'fa-circle-check' : 'fa-circle-info');
-    } catch { showToast('Error claiming deal', 'fa-triangle-exclamation'); }
-}
-
-async function handleClaimNight() {
-    if (!state.activeMobile) return;
-    showToast('Claiming night deal...', 'fa-fire');
-    try {
-        const res = await fetch('/api/deals/night', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: state.activeMobile })
-        });
-        const data = await res.json();
-        showToast(data.success ? 'Night deal claimed!' : (data.error || 'Unavailable'), data.success ? 'fa-circle-check' : 'fa-circle-info');
-    } catch { showToast('Error claiming deal', 'fa-triangle-exclamation'); }
-}
-
 /* ── ADDRESS ───────────────────────────────────────── */
 
 async function fetchAddressesForActiveAccount(isSilent = false, isManual = false) {
@@ -1255,7 +1154,6 @@ async function fetchAddressesForActiveAccount(isSilent = false, isManual = false
     if (banner) banner.style.display = 'none';
     content.style.display = 'block';
 
-    // the cached list only counts for the account it was loaded for
     const hasCached = state.addrOwner === String(state.activeMobile)
         && ((state.globalAddresses && state.globalAddresses.length > 0) || (state.accountAddresses && state.accountAddresses.length > 0));
 
@@ -1265,7 +1163,6 @@ async function fetchAddressesForActiveAccount(isSilent = false, isManual = false
 
     if (refreshIcon) refreshIcon.classList.add('fa-spin');
 
-    // this account's list at once if we have it, else loading blocks until it comes
     if (hasCached) { if (isSilent) renderAddressesList(); }
     else listEl.innerHTML = addrSkeleton();
 
@@ -1336,31 +1233,19 @@ function renderAddressesList() {
         return;
     }
 
-    // 1. Global Web Addresses Section
     if (globalAddrs.length > 0) {
         html += globalAddrs.map(a => renderSingleAddressCard(a, true)).join('');
     }
 
-    // Very thin simple inline line divider between global addresses and account addresses
     if (globalAddrs.length > 0 && accountAddrs.length > 0) {
         html += `<div style="border-top: 1px solid var(--border-color); margin: 10px 0;"></div>`;
     }
 
-    // 2. Swiggy Account Saved Addresses Section
     if (accountAddrs.length > 0) {
         html += accountAddrs.map(a => renderSingleAddressCard(a, false)).join('');
     }
 
     listEl.innerHTML = html;
-}
-
-function formatTitleCase(str) {
-    if (!str) return 'Receiver';
-    return String(str)
-        .toLowerCase()
-        .split(' ')
-        .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : '')
-        .join(' ');
 }
 
 function renderSingleAddressCard(a, isGlobal) {
@@ -1434,10 +1319,10 @@ async function _deleteAddressNow(addressId, isGlobal) {
 
 let addressMap = null;
 let addressMarker = null;
-let currentSelectedLat = 22.5726; // Kolkata fallback
+let currentSelectedLat = 22.5726;
 let currentSelectedLng = 88.3639;
 let currentSelectedAnnotation = 'Home';
-let currentGeoInfo = {};  // reverse-geocode details of the pinned spot (city, pincode, ...)
+let currentGeoInfo = {};
 let mapSearchDebounceTimer = null;
 let selectedInstructionPills = new Set();
 
@@ -1446,12 +1331,10 @@ function openAddAddressPage() {
         showToast('Please select an active account first', true);
         return;
     }
-    // Switch to the add-address tab (which will call initAddAddressPageMap)
     switchTab('add-address');
 }
 
 function initAddAddressPageMap() {
-    // Pre-fill receiver details if active session exists
     const recName = document.getElementById('addrReceiverName');
     const recPhone = document.getElementById('addrReceiverPhone');
     if (state.activeSession) {
@@ -1459,14 +1342,11 @@ function initAddAddressPageMap() {
         if (recPhone && !recPhone.value) recPhone.value = state.activeMobile || '';
     }
 
-    // Wait for the tab to be fully visible before initializing Leaflet
     setTimeout(() => {
         initLeafletMap(currentSelectedLat, currentSelectedLng);
-        // Silently attempt GPS location lookup without popping error toasts
         getCurrentGpsLocation(true);
     }, 200);
 
-    // Force resize after map is fully rendered
     setTimeout(() => {
         if (addressMap) {
             addressMap.invalidateSize();
@@ -1474,7 +1354,6 @@ function initAddAddressPageMap() {
         }
     }, 500);
 
-    // One more invalidate for safety (some browsers need extra time)
     setTimeout(() => {
         if (addressMap) addressMap.invalidateSize();
     }, 1000);
@@ -1501,32 +1380,11 @@ function selectAnnotationTag(tag, btnEl) {
     if (btnEl) btnEl.classList.add('active');
 }
 
-function toggleInstructionPill(text, btnEl) {
-    if (selectedInstructionPills.has(text)) {
-        selectedInstructionPills.delete(text);
-        if (btnEl) btnEl.classList.remove('active');
-    } else {
-        selectedInstructionPills.add(text);
-        if (btnEl) btnEl.classList.add('active');
-    }
-    const instrInput = document.getElementById('addrInstructions');
-    if (instrInput) {
-        instrInput.value = Array.from(selectedInstructionPills).join(', ');
-    }
-}
-
 function initLeafletMap(lat, lng) {
-    if (!window.L) {
-        console.error('[Map] Leaflet library not loaded');
-        return;
-    }
+    if (!window.L) return;
     const mapEl = document.getElementById('addressLeafletMap');
-    if (!mapEl) {
-        console.error('[Map] Map container element not found');
-        return;
-    }
+    if (!mapEl) return;
 
-    // If map already exists, just reposition and resize
     if (addressMap) {
         addressMap.invalidateSize();
         addressMap.setView([lat, lng], 16);
@@ -1535,7 +1393,6 @@ function initLeafletMap(lat, lng) {
         return;
     }
 
-    // Destroy any stale Leaflet instance on the element
     if (mapEl._leaflet_id) {
         try { mapEl._leaflet_id = undefined; } catch(e) {}
     }
@@ -1545,7 +1402,6 @@ function initLeafletMap(lat, lng) {
         attributionControl: true
     }).setView([lat, lng], 16);
 
-    // Use OpenStreetMap tiles with proper HTTPS
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         subdomains: ['a', 'b', 'c'],
@@ -1575,7 +1431,6 @@ function initLeafletMap(lat, lng) {
         reverseGeocodeCoords(e.latlng.lat, e.latlng.lng);
     });
 
-    // Force invalidate after small delays to ensure tiles render
     setTimeout(() => { if (addressMap) addressMap.invalidateSize(); }, 100);
     setTimeout(() => { if (addressMap) addressMap.invalidateSize(); }, 300);
     setTimeout(() => { if (addressMap) addressMap.invalidateSize(); }, 600);
@@ -1585,11 +1440,11 @@ function initLeafletMap(lat, lng) {
 
 function getCurrentGpsLocation(isSilent = false) {
     if (!navigator.geolocation) {
-        if (!isSilent) showToast('Geolocation is not supported by your browser', true);
+        if (!isSilent) showToast('Geolocation is not supported', true);
         return;
     }
 
-    if (!isSilent) showToast('Locating your GPS position...', false);
+    if (!isSilent) showToast('Locating GPS position...', false);
     navigator.geolocation.getCurrentPosition(
         (pos) => {
             currentSelectedLat = pos.coords.latitude;
@@ -1600,12 +1455,10 @@ function getCurrentGpsLocation(isSilent = false) {
                 addressMarker.setLatLng([currentSelectedLat, currentSelectedLng]);
             }
             reverseGeocodeCoords(currentSelectedLat, currentSelectedLng);
-            if (!isSilent) showToast('GPS Location pinned!', false);
+            if (!isSilent) showToast('GPS pinned!', false);
         },
-        (err) => {
-            if (!isSilent) {
-                showToast('Could not retrieve GPS position. Please search or pick on map.', true);
-            }
+        () => {
+            if (!isSilent) showToast('Could not retrieve GPS position.', true);
         },
         { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -1630,9 +1483,7 @@ async function reverseGeocodeCoords(lat, lng) {
 
             if (titleEl) titleEl.innerText = mainName;
             if (subEl) subEl.innerText = fullStr;
-            if (areaInput) {
-                areaInput.value = fullStr;
-            }
+            if (areaInput) areaInput.value = fullStr;
         } else {
             if (titleEl) titleEl.innerText = "Pinned Location";
             if (subEl) subEl.innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
@@ -1642,6 +1493,7 @@ async function reverseGeocodeCoords(lat, lng) {
         if (subEl) subEl.innerText = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
     }
 }
+
 async function fetchMapSearchSuggestions(query) {
     const dropdown = document.getElementById('mapSearchResults');
     if (!dropdown) return;
@@ -1659,7 +1511,7 @@ async function fetchMapSearchSuggestions(query) {
             return;
         }
 
-        dropdown.innerHTML = items.map((item, idx) => {
+        dropdown.innerHTML = items.map((item) => {
             const safeDesc = (item.description || item.main_text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const hasCoords = item.lat && item.lng;
             const placeId = (item.place_id || '').replace(/'/g, "\\'");
@@ -1693,11 +1545,8 @@ async function selectMapSearchByPlaceId(placeId, fullAddress) {
             selectMapSearchSuggestion(data.details.lat, data.details.lng, data.details.address || fullAddress);
             return;
         }
-    } catch (e) {
-        console.error('[Map] Place details error:', e);
-    }
+    } catch (e) {}
 
-    // Fallback: just set the address text
     const areaInput = document.getElementById('addrArea');
     if (areaInput) areaInput.value = fullAddress;
     showToast('Could not get exact coordinates for this place', true);
@@ -1730,10 +1579,7 @@ function selectMapSearchSuggestion(lat, lng, fullAddress) {
 
 function handleMapSearchInput(q) {
     const query = (q || '').trim();
-    const clearBtn = document.getElementById('mapClearSearchBtn');
     const dropdown = document.getElementById('mapSearchResults');
-
-    if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
 
     if (query.length < 2) {
         if (dropdown) dropdown.style.display = 'none';
@@ -1744,15 +1590,6 @@ function handleMapSearchInput(q) {
     mapSearchDebounceTimer = setTimeout(() => {
         fetchMapSearchSuggestions(query);
     }, 300);
-}
-
-function clearMapSearch() {
-    const input = document.getElementById('mapSearchInput');
-    if (input) input.value = '';
-    const clearBtn = document.getElementById('mapClearSearchBtn');
-    if (clearBtn) clearBtn.style.display = 'none';
-    const dropdown = document.getElementById('mapSearchResults');
-    if (dropdown) dropdown.style.display = 'none';
 }
 
 async function handleSaveManualAddress() {
@@ -1802,7 +1639,7 @@ async function handleSaveManualAddress() {
         });
         const data = await res.json();
         if (data.success) {
-            showToast('Address saved! It is added to the account when you pick it in the cart.', false, 2200);
+            showToast('Address saved!', false, 2200);
             switchTab('address');
             fetchAddressesForActiveAccount();
         } else {
@@ -1818,7 +1655,6 @@ async function handleAddAddressByLink() {
     const link = linkInput ? linkInput.value.trim() : '';
     if (!link) { showToast('Paste a link first', true); return; }
 
-    // Close the modal first so errors/toasts appear on top
     closeLinkImportModal();
     showToast('Importing address from link...', false);
 
@@ -1881,10 +1717,9 @@ async function loadHourOrdersCount() {
     try {
         const d = await (await fetch('/api/orders_recent?minutes=60&live=false')).json();
         setHourCount((d.orders || []).length);
-    } catch (e) { /* ignore */ }
+    } catch (e) {}
 }
 
-// loading blocks while the address list comes (same shimmer blocks as restaurant search)
 function addrSkeleton(n = 4) {
     return '<div class="sr-skel addr-skel-head"></div>' + Array.from({ length: n }, () => '<div class="sr-skel addr-skel-block"></div>').join('');
 }
@@ -1899,12 +1734,7 @@ function ordersSkeleton(n = 3) {
 
 const odEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-
-// one order card for both lists (This Account / Last 1 Hour); tap = full details
 const ocStore = {};
-
-// order stage from the status text: decides colour, icon, progress and which sections the details page shows
-const OC_STEPS = ['Placed', 'Confirmed', 'Partner assigned', 'Out for delivery', 'Delivered'];
 
 function ocStage(status) {
     const s = String(status || '').toLowerCase();
@@ -1929,14 +1759,12 @@ function ocStage(status) {
     return T[k];
 }
 
-// item names for the pills on the outer card
 function ocItemNames(o) {
     const L = Array.isArray(o.item_lines) ? o.item_lines : [];
     if (L.length) return L.map(i => ({ name: `${i.name}${Number(i.quantity) > 1 ? ' × ' + i.quantity : ''}`, veg: i.veg }));
     return String(o.items || '').split(/,\s*/).map(x => x.trim()).filter(Boolean).map(name => ({ name }));
 }
 
-// Swiggy's veg / non-veg square (a fork when Swiggy didn't say)
 function odVegMark(veg) {
     if (veg === true) return '<span class="odi-mark veg"><i></i></span>';
     if (veg === false) return '<span class="odi-mark nonveg"><i></i></span>';
@@ -1969,15 +1797,8 @@ function ocCard(o) {
     </div>`;
 }
 
-/* ── ORDER DETAIL PAGE ── */
-
 let odOpenId = null;
 
-function odRow(label, value, cls = '') {
-    return `<div class="odp-row ${cls}"><span>${odEsc(label)}</span><b>${odEsc(value)}</b></div>`;
-}
-
-// confetti for a delivered order (same idea as blinkit_bot)
 function odConfetti(on) {
     if (!on) return '';
     const colors = ['#38bdf8', '#fc8019', '#10b981', '#f2d74e', '#e879f9'];
@@ -1994,14 +1815,12 @@ function renderOrderDetail(o, loading) {
     const live = st.tone === 'live';
     const label = String(o.status || '').replace(/_/g, ' ').trim();
     const cap = t => String(t || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-    // live orders show Swiggy's own words ("Arrived at location"); finished ones the clean title
     const title = live && label && !/^(placed|order placed)$/i.test(label) ? label : st.title;
     const sub = live ? (o.eta ? 'Arriving in ' + o.eta : (o.substatus || st.sub))
         : (st.key === 'delivered' && o.delivered_at ? 'Delivered on ' + odTime(o.delivered_at) : st.sub);
     const person = (name, phone) => [cap(name), phone].filter(Boolean).map(odEsc).join(' | ');
     const row = (k, v, cls = '') => `<div class="sp-row ${cls}"><span>${k}</span><b>${v}</b></div>`;
 
-    // ── Order Information (same rows as the Order Placed page) ──
     const info = [];
     info.push(row('Order ID', `<span class="sp-id">#${odEsc(o.order_id)}</span><button type="button" class="odk-copy" onclick="copyOrderId()" title="Copy"><i class="fa-regular fa-copy"></i></button>`));
     if (o.payment) info.push(row('Paid Via', `<span class="odk-pay">${odEsc(odPayName(o.payment))}</span>`));
@@ -2017,13 +1836,11 @@ function renderOrderDetail(o, loading) {
         else if (live) info.push(row('Delivery Partner', '<span class="od-muted">Not assigned yet</span>'));
     }
 
-    // ── Delivery Address: Deliver To, then Receiver Contact under a dashed line ──
     const addrHtml = (addr.text || addr.name || addr.phone) ? `<div class="sp-addr">
         ${addr.text ? `<div class="sp-addr-row"><span>Deliver To:</span><div>${odEsc(addr.text)}</div></div>` : ''}
         ${addr.name || addr.phone ? `<div class="sp-addr-row sp-addr-recv"><span>Receiver Contact:</span><div>${person(addr.name, addr.phone)}</div></div>` : ''}
     </div>` : '';
 
-    // ── Ordered Items Summary (same lines as the Order Placed page) ──
     const itemsHtml = lines.length ? lines.map(i => {
         const extra = [...(i.variants || []), ...(i.addons || []).map(a => typeof a === 'string' ? a : a.name + (a.price ? ` (+₹${a.price})` : ''))].filter(Boolean);
         return `<div class="sc-line sp-line">
@@ -2036,7 +1853,6 @@ function renderOrderDetail(o, loading) {
     }).join('')
         : (o.items ? `<div class="od-items-text">${odEsc(o.items)}</div>` : '<div class="od-muted">Item details are not available for this order.</div>');
 
-    // ── Payment & Bill Summary ──
     const billHtml = bill.length ? bill.map(l => `<div class="sc-bill-row ${l.total ? 'total' : ''} ${l.negative ? 'save' : ''}">
             <span>${odEsc(l.label)}</span><span>${l.negative ? '−' : ''}${odEsc(l.value)}</span></div>`).join('')
         : `<div class="sc-bill-row total"><span>Total Paid</span><span>₹${odEsc(o.amount)}</span></div>`;
@@ -2065,7 +1881,6 @@ function renderOrderDetail(o, loading) {
         </div>`;
 }
 
-// Swiggy's payment codes ("UPIIntent", "SwiggyPay", "CashOnDelivery"...) -> what a person reads
 function odPayName(raw) {
     const s = String(raw || '').trim();
     const k = s.toLowerCase().replace(/[\s_-]/g, '');
@@ -2078,12 +1893,9 @@ function odPayName(raw) {
     if (k.includes('paylater') || k.includes('lazypay') || k.includes('simpl')) return 'Pay Later';
     const wallets = { paytm: 'Paytm', phonepe: 'PhonePe', amazonpay: 'Amazon Pay', mobikwik: 'MobiKwik', freecharge: 'Freecharge', googlepay: 'Google Pay', gpay: 'Google Pay' };
     for (const w in wallets) if (k.includes(w)) return wallets[w];
-    // anything else: split "SomeNewMethod" into "Some New Method"
     return s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
 }
 
-// any time we get -> "22/10/26 9:16 PM" (India time)
-//   "2026-10-22 21:16:24" (Swiggy, already IST) | epoch seconds/ms | ISO with Z (our DB, UTC)
 const _odFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
 function odTime(v) {
     if (v === null || v === undefined || v === '' || v === 0) return '';
@@ -2098,13 +1910,11 @@ function odTime(v) {
     } else {
         d = new Date(str);
     }
-    // a format we do not know (or no year in it, which Date would guess wrong): show it as it is
     if (isNaN(d.getTime()) || (!m && !/^\d{9,13}$/.test(str) && !/\b(19|20)\d{2}\b/.test(str))) return str;
     const p = Object.fromEntries(_odFmt.formatToParts(d).map(x => [x.type, x.value]));
     return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute} ${String(p.dayPeriod || '').toUpperCase()}`;
 }
 
-// open a link in the real browser (Telegram mini app: openLink, else a new tab)
 function odOpenLink(url) {
     if (!url) return;
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -2153,7 +1963,7 @@ async function openOrderDetail(orderId, refreshOnly) {
     try {
         const url = mobile ? `/api/order_detail/${encodeURIComponent(mobile)}/${encodeURIComponent(orderId)}` : `/api/order_detail/${encodeURIComponent(orderId)}`;
         const d = await (await fetch(url)).json();
-        if (odOpenId !== orderId) return;   // closed or switched while loading
+        if (odOpenId !== orderId) return;
         if (d.success && d.order) {
             const f = d.order;
             const pay = f.payment ? (/cod|cash/i.test(f.payment) ? 'Cash on Delivery' : f.payment) : base.payment;
@@ -2195,7 +2005,7 @@ async function loadHourOrders(manual) {
     box.innerHTML = ordersSkeleton(2);
     _odSpin('odRefresh', true);
     let data = null;
-    try { data = await (await fetch('/api/orders_recent?minutes=60&_=' + Date.now())).json(); } catch (e) { /* offline */ }
+    try { data = await (await fetch('/api/orders_recent?minutes=60&live=false')).json(); } catch (e) {}
     _odSpin('odRefresh', false);
     if (ordersTab !== 'hour') return;
     if (!data) { box.innerHTML = odEmpty('Could not load orders', 'Check your connection and try again.'); return; }
@@ -2247,7 +2057,7 @@ async function fetchOrdersForActiveAccount(manual) {
         const res = await fetch(`/api/orders/${mobile}?_=${Date.now()}`);
         const data = await res.json();
         _odSpin('odRefresh', false);
-        if (mobile !== state.activeMobile || ordersTab !== 'acc') return;   // switched while loading
+        if (mobile !== state.activeMobile || ordersTab !== 'acc') return;
         if (data.is_expired) {
             listEl.innerHTML = odEmpty('Session Expired', `+91 ${mobile} needs to log in again.`, false);
             showToast(`Session expired for +91 ${mobile}`, true);
@@ -2263,7 +2073,7 @@ async function fetchOrdersForActiveAccount(manual) {
         }
         if (data.success) {
             state.orders = data.orders || [];
-                    renderOrdersList();
+            renderOrdersList();
             if (manual === true) showToast('Refreshed', 'fa-circle-check');
         } else {
             listEl.innerHTML = odEmpty('Could not load orders', 'Something went wrong, try again.');
@@ -2272,13 +2082,6 @@ async function fetchOrdersForActiveAccount(manual) {
         _odSpin('odRefresh', false);
         listEl.innerHTML = odEmpty('Could not load orders', 'Check your connection and try again.');
     }
-}
-
-function filterOrderTag(tag, btn) {
-    state.activeOrderTagFilter = tag;
-    document.querySelectorAll('.order-filter-chip').forEach(c => c.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    renderOrdersList();
 }
 
 function renderOrdersList() {
@@ -2303,21 +2106,8 @@ function renderOrdersList() {
     })).join('');
 }
 
-function downloadRawOrdersJson() {
-    if (!state.orders.length) { showToast('No orders to export', 'fa-triangle-exclamation'); return; }
-    const a = document.createElement('a');
-    a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state.orders, null, 2));
-    a.download = `orders_${state.activeMobile || 'export'}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    showToast('JSON exported!', 'fa-circle-check');
-}
+/* ── TOOLS PAGE: free cash offers ─────────────── */
 
-/* ── TOOLS PAGE: free cash offers + Decoders links ─────────────── */
-
-// claim windows are India time (deadline = last minute to claim today)
-// Swiggy's "Pick your offer" page (value 1-4 in that order); breakfast and night have the same four
 const TL_CHOICES_LIST = [
     { value: 1, title: '₹50 Free Cash', min: 199 },
     { value: 2, title: '₹150 OFF Coupon', min: 249 },
@@ -2330,7 +2120,7 @@ const TL_OFFERS = [
     { key: 'night', action: 'night', title: 'Night Offer', amount: 50, icon: 'fa-moon', tone: 'night',
       desc: 'Use today at 9:00 PM', from: [11, 0], until: [18, 30], note: 'Claim before 6:30 PM', opens: '11:00 AM', anim: 'rock' },
     { key: 'breakfast', action: 'breakfast', title: 'Breakfast Offer', amount: 50, icon: 'fa-sun', tone: 'bf',
-      desc: 'Use tomorrow at 8:00 AM', from: [11, 0], until: [2, 0], note: 'Claim before 2:00 AM', opens: '11:00 AM', anim: 'spin' },   // until < from: window runs past midnight
+      desc: 'Use tomorrow at 8:00 AM', from: [11, 0], until: [2, 0], note: 'Claim before 2:00 AM', opens: '11:00 AM', anim: 'spin' },
     { key: 'instant', action: '', title: 'Instant Offer', amount: 50, icon: 'fa-bolt', tone: 'inst',
       desc: 'Claim & use instantly, anytime', note: 'Claim & use anytime', soon: true, anim: 'pulse' },
 ];
@@ -2342,22 +2132,18 @@ function tlIstNow() {
     return { h: d.getHours(), m: d.getMinutes(), s: d.getSeconds() };
 }
 
-// "Ends in 2h 10m" until the deadline, then "Ended for today"
-// claim window of the day (India time): before it "Opens at ... · in ...", inside "Claim before ... · Ends in ...",
-// after it "Ended for today · opens ..."
 function tlTimeLeft(o) {
-    if (o.closed) return { text: 'Closed · coming soon', live: false, open: false };   // closed: true on TL_OFFERS = shut for now
+    if (o.closed) return { text: 'Closed · coming soon', live: false, open: false };
     if (!o.until) return { text: o.note, live: true, open: true };
     const n = tlIstNow();
     const now = n.h * 3600 + n.m * 60 + n.s;
     const from = o.from ? (o.from[0] * 60 + o.from[1]) * 60 : 0;
     const until = (o.until[0] * 60 + o.until[1]) * 60;
     const DAY = 86400;
-    const wraps = until <= from;   // e.g. breakfast 11:00 AM -> 2:00 AM (next day)
+    const wraps = until <= from;
     const dur = s => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return `${h ? h + 'h ' : ''}${m}m`; };
     const open = wraps ? (now >= from || now < until) : (now >= from && now < until);
     if (!open) {
-        // before the window opens: [until, from) when it wraps, before `from` otherwise
         const beforeOpen = wraps ? (now >= until && now < from) : now < from;
         if (beforeOpen) return { text: `Opens at ${o.opens} · in ${dur(from - now)}`, live: false, open: false };
         return { text: `Ended for today · opens ${o.opens}`, live: false, open: false };
@@ -2382,11 +2168,9 @@ function renderToolsPage() {
             <i class="fa-solid fa-chevron-right tl-offer-go"></i>
         </button>`;
     }).join('');
-    clearInterval(tl.timer);   // keep the countdowns ticking while the page is open
+    clearInterval(tl.timer);
     tl.timer = setInterval(() => { if (state.activeTab === 'tools') renderToolsPage(); else clearInterval(tl.timer); }, 30000);
 }
-
-/* claim sheet: pick accounts, claim, see each result */
 
 function tlOpenOffer(key) {
     const o = TL_OFFERS.find(x => x.key === key);
@@ -2403,17 +2187,14 @@ function tlOpenOffer(key) {
     tlLoadClaimed(o.action);
 }
 
-// accounts that already claimed this offer today: tagged, and left out of "Select all"
 async function tlLoadClaimed(action) {
     try {
         const d = await (await fetch('/api/offers/claimed?offer=' + encodeURIComponent(action))).json();
-        if (!tl.offer || tl.offer.action !== action) return;   // closed or switched meanwhile
+        if (!tl.offer || tl.offer.action !== action) return;
         tl.claimed = new Set((d.mobiles || []).map(String));
         tlRenderSheet();
-    } catch (e) { /* no marks, nothing else changes */ }
+    } catch (e) {}
 }
-
-const tlClaimedToday = mob => tl.claimed.has(String(mob));
 
 function tlCloseSheet(e) {
     if (e && e.target !== e.currentTarget) return;
@@ -2423,6 +2204,7 @@ function tlCloseSheet(e) {
 
 const tlExpired = s => s.is_expired || s.status === 'expired' || s.valid === false;
 const tlOrdered = s => !!(s.is_done || s.order_count);
+const tlClaimedToday = mob => tl.claimed.has(String(mob));
 
 function tlVisible() {
     const q = tl.q.toLowerCase();
@@ -2440,7 +2222,7 @@ function tlRenderSheet() {
     const usable = list.filter(s => !tlExpired(s) && !tlClaimedToday(s.mobile));
     const allOn = usable.length > 0 && usable.every(s => tl.picked.has(String(s.mobile)));
     const counts = { all: state.sessions.length, new: state.sessions.filter(s => !tlOrdered(s)).length, ordered: state.sessions.filter(tlOrdered).length };
-    const done = Object.values(tl.results).filter(r => !r.pending);   // finished ones only
+    const done = Object.values(tl.results).filter(r => !r.pending);
     const ok = done.filter(r => r.success).length;
     document.getElementById('tlSheetBody').innerHTML = `
         ${tlPickerHtml()}
@@ -2455,7 +2237,6 @@ function tlRenderSheet() {
     tlRenderList();
 }
 
-// offer picker: a plain select line; the choices open below it as simple radio lines
 function tlChoice() {
     const list = TL_CHOICES[tl.offer.key] || [];
     return list.find(c => c.value === tl.value) || list[0] || TL_CHOICES_LIST[0];
@@ -2480,7 +2261,6 @@ function tlPickerHtml() {
 }
 
 function tlTogglePick() { tl.pickOpen = !tl.pickOpen; tlRenderSheet(); }
-
 function tlChoose(v) { tl.value = v; tl.pickOpen = false; tlRenderSheet(); }
 
 function tlRenderList() {
@@ -2520,13 +2300,12 @@ function tlPick(mob, on) {
 }
 
 function tlToggleAll() {
-    const usable = tlVisible().filter(s => !tlExpired(s) && !tlClaimedToday(s.mobile)).map(s => String(s.mobile));   // claimed today: pick by hand only
+    const usable = tlVisible().filter(s => !tlExpired(s) && !tlClaimedToday(s.mobile)).map(s => String(s.mobile));
     const allOn = usable.length && usable.every(m => tl.picked.has(m));
     usable.forEach(m => allOn ? tl.picked.delete(m) : tl.picked.add(m));
     tlRenderSheet();
 }
 
-// 5 accounts per request so the results show up as they come in
 async function tlClaim() {
     const mobiles = [...tl.picked];
     if (!mobiles.length || tl.running) return;
@@ -2539,7 +2318,7 @@ async function tlClaim() {
         try {
             d = await (await fetch('/api/tools/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: tl.offer.action, mobiles: chunk, slot: tl.value }) })).json();
-        } catch (e) { /* offline */ }
+        } catch (e) {}
         const got = {};
         ((d && d.results) || []).forEach(r => { got[String(r.mobile)] = r; });
         chunk.forEach(m => {
@@ -2554,1135 +2333,4 @@ async function tlClaim() {
     const when = tl.offer.key === 'breakfast' ? 'claimed for tomorrow morning' : 'claimed for tonight';
     showToast(`${ok} of ${mobiles.length} ${when}`, ok ? 'fa-circle-check' : true, 3000);
     tlRenderSheet();
-}
-
-/* ── TOOLS & BATCH AUTOMATION ──────────────────────── */
-
-let toolsState = {
-    searchQuery: '',
-    filter: 'all',
-    selectedMobiles: new Set(),
-    selectedSlot: 1
-};
-
-function renderToolsView() {
-    const listEl = document.getElementById('toolsAccountList');
-    if (!listEl) return;
-
-    const query = (toolsState.searchQuery || '').toLowerCase().trim();
-    const filter = toolsState.filter || 'all';
-
-    // Calculate filter counts across all sessions
-    const counts = {
-        all: state.sessions.length,
-        new: state.sessions.filter(s => !s.total_orders || s.total_orders === 0).length,
-        ordered: state.sessions.filter(s => s.total_orders && s.total_orders > 0).length,
-        otp: state.sessions.filter(s => s.login_mode === 'otp' || !s.login_mode).length,
-        json: state.sessions.filter(s => s.login_mode === 'json').length
-    };
-
-    // Update filter pill badges
-    const pillAll = document.getElementById('tools-filter-all');
-    const pillNew = document.getElementById('tools-filter-new');
-    const pillOrd = document.getElementById('tools-filter-ordered');
-    const pillOtp = document.getElementById('tools-filter-otp');
-    const pillJson = document.getElementById('tools-filter-json');
-
-    if (pillAll) pillAll.innerText = `All (${counts.all})`;
-    if (pillNew) pillNew.innerText = `New (${counts.new})`;
-    if (pillOrd) pillOrd.innerText = `Ordered (${counts.ordered})`;
-    if (pillOtp) pillOtp.innerText = `OTP Login (${counts.otp})`;
-    if (pillJson) pillJson.innerText = `JSON Imported (${counts.json})`;
-
-    // Filter sessions
-    let filtered = state.sessions.filter(s => {
-        const mob = String(s.mobile || s.phone || '');
-        const name = String(s.name || '').toLowerCase();
-        
-        // Search check
-        if (query && !mob.includes(query) && !name.includes(query)) {
-            return false;
-        }
-
-        // Category filter check
-        if (filter === 'new') return !s.total_orders || s.total_orders === 0;
-        if (filter === 'ordered') return s.total_orders && s.total_orders > 0;
-        if (filter === 'otp') return s.login_mode === 'otp' || !s.login_mode;
-        if (filter === 'json') return s.login_mode === 'json';
-
-        return true;
-    });
-
-    const totalEl = document.getElementById('toolsAccountListTotal');
-    if (totalEl) totalEl.innerText = `${filtered.length} shown`;
-
-    const selectedPill = document.getElementById('toolsSelectedCountPill');
-    if (selectedPill) selectedPill.innerText = `${toolsState.selectedMobiles.size} Selected`;
-
-    const iconsBar = document.querySelector('.tools-action-icons-bar');
-    if (iconsBar) {
-        if (toolsState.selectedMobiles.size > 0) {
-            iconsBar.style.display = 'grid';
-        } else {
-            iconsBar.style.display = 'none';
-        }
-    }
-
-    if (filtered.length === 0) {
-        listEl.innerHTML = `
-            <div style="text-align:center; padding:18px; color:var(--text-muted); font-size:12px;">
-                No accounts match the current search & filter.
-            </div>`;
-        return;
-    }
-
-    listEl.innerHTML = filtered.map(s => {
-        const mob = String(s.mobile || s.phone || '');
-        const name = s.name || 'User';
-        const isSelected = toolsState.selectedMobiles.has(mob);
-        const isExpired = s.is_expired || s.status === 'expired';
-        const statusTag = isExpired ? 'Expired' : (s.status || 'Active');
-        const badgeColor = isExpired ? '#ef4444' : '#10b981';
-
-        let swiggyCount = s.swiggy_count || 0;
-        if (s.orders && Array.isArray(s.orders)) {
-            swiggyCount = s.orders.filter(o => o._order_tag === '#swiggy').length;
-        }
-
-        const ordersSub = swiggyCount
-            ? `<i class="fa-solid fa-cart-shopping"></i> ${swiggyCount} Swiggy`
-            : `${s.total_orders || 0} orders`;
-
-        return `
-        <div class="tools-account-checkbox-item ${isSelected ? 'selected' : ''}" onclick="toggleToolsAccountRow('${mob}', event)">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <input type="checkbox" id="chk_tools_${mob}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleToolsAccountSelection('${mob}', this.checked)">
-                <div>
-                    <div style="font-family:var(--font-heading); font-size:13px; font-weight:700; color:var(--text-main);">
-                        +91 ${mob} <span style="font-size:11px; font-weight:500; color:var(--text-muted); margin-left:4px;">(${name})</span>
-                    </div>
-                    <div style="font-size:10.5px; color:var(--text-muted); margin-top:2px;">
-                        ${ordersSub}
-                    </div>
-                </div>
-            </div>
-            <span style="font-size:10px; font-weight:700; background:rgba(0,0,0,0.2); color:${badgeColor}; padding:2px 8px; border-radius:10px;">
-                ${statusTag}
-            </span>
-        </div>`;
-    }).join('');
-}
-
-function filterToolsAccounts(query) {
-    toolsState.searchQuery = query;
-    renderToolsView();
-}
-
-function setToolsAccountFilter(filterName, btnEl) {
-    toolsState.filter = filterName;
-    document.querySelectorAll('#view-tools .filter-pill').forEach(b => b.classList.remove('active'));
-    if (btnEl) btnEl.classList.add('active');
-    renderToolsView();
-}
-
-function toggleToolsAccountRow(mobile, event) {
-    const chk = document.getElementById(`chk_tools_${mobile}`);
-    if (chk) {
-        chk.checked = !chk.checked;
-        toggleToolsAccountSelection(mobile, chk.checked);
-    }
-}
-
-function toggleToolsAccountSelection(mobile, isChecked) {
-    if (isChecked) {
-        toolsState.selectedMobiles.add(mobile);
-    } else {
-        toolsState.selectedMobiles.delete(mobile);
-    }
-    renderToolsView();
-}
-
-function selectAllToolsAccounts(selectAll = true) {
-    const query = (toolsState.searchQuery || '').toLowerCase().trim();
-    const filter = toolsState.filter || 'all';
-
-    let filtered = state.sessions.filter(s => {
-        const mob = String(s.mobile || s.phone || '');
-        const name = String(s.name || '').toLowerCase();
-        if (query && !mob.includes(query) && !name.includes(query)) return false;
-        if (filter === 'new') return !s.total_orders || s.total_orders === 0;
-        if (filter === 'ordered') return s.total_orders && s.total_orders > 0;
-        if (filter === 'otp') return s.login_mode === 'otp' || !s.login_mode;
-        if (filter === 'json') return s.login_mode === 'json';
-        return true;
-    });
-
-    filtered.forEach(s => {
-        const mob = String(s.mobile || s.phone || '');
-        if (selectAll) {
-            toolsState.selectedMobiles.add(mob);
-        } else {
-            toolsState.selectedMobiles.delete(mob);
-        }
-    });
-
-    renderToolsView();
-}
-
-function selectToolsSlot(slotNumber, element) {
-    toolsState.selectedSlot = slotNumber;
-    document.querySelectorAll('.slot-radio-card').forEach(c => c.classList.remove('active'));
-    if (element) element.classList.add('active');
-}
-
-let pendingToolsAction = 'claim_breakfast';
-
-function openToolsOfferModal(actionName) {
-    const mobiles = Array.from(toolsState.selectedMobiles);
-    if (!mobiles.length) {
-        showToast('Select at least one account first!', true);
-        return;
-    }
-    pendingToolsAction = actionName;
-
-    const modal = document.getElementById('toolsSlotModal');
-    const titleEl = document.getElementById('toolsSlotModalTitle');
-    if (!modal) return;
-
-    if (titleEl) {
-        titleEl.innerText = actionName === 'claim_breakfast' ? 'Breakfast Offer Slot' : 'Late Night Offer Slot';
-    }
-
-    modal.style.display = 'flex';
-}
-
-function closeToolsSlotModal(event) {
-    if (event && event.target && event.target.id !== 'toolsSlotModal' && !event.target.classList.contains('modal-close-btn')) {
-        return;
-    }
-    const modal = document.getElementById('toolsSlotModal');
-    if (modal) modal.style.display = 'none';
-}
-
-function confirmToolsOfferClaim() {
-    closeToolsSlotModal();
-    triggerBatchAction(pendingToolsAction);
-}
-
-function closeToolsProgressModal() {
-    const modal = document.getElementById('toolsProgressModal');
-    if (modal) modal.style.display = 'none';
-}
-
-async function triggerBatchAction(actionName) {
-    const mobiles = Array.from(toolsState.selectedMobiles);
-    if (!mobiles.length) {
-        showToast('Select at least one account to execute action!', true);
-        return;
-    }
-
-    const actionTitleMap = {
-        claim_breakfast: 'Breakfast Offer Claim',
-        claim_night: 'Late Night Offer Claim',
-        check_alive: 'Check Alive Status',
-        delete_addresses: 'Delete Saved Addresses'
-    };
-
-    const title = actionTitleMap[actionName] || actionName;
-
-    const progressModal = document.getElementById('toolsProgressModal');
-    const titleEl = document.getElementById('toolsProgressTitle');
-    const subEl = document.getElementById('toolsProgressSub');
-    const barFill = document.getElementById('toolsProgressBarFill');
-    const resultsList = document.getElementById('toolsProgressResultsList');
-    const doneBtn = document.getElementById('toolsProgressDoneBtn');
-    const closeBtn = document.getElementById('toolsProgressCloseBtn');
-    const headerIcon = document.getElementById('toolsProgressHeaderIcon');
-
-    if (!progressModal || !resultsList) return;
-
-    if (titleEl) titleEl.innerText = title;
-    if (subEl) subEl.innerText = `Processing ${mobiles.length} account(s) in parallel (30 workers)...`;
-    if (barFill) barFill.style.width = '15%';
-    if (doneBtn) doneBtn.style.display = 'none';
-    if (closeBtn) closeBtn.style.display = 'none';
-    if (headerIcon) headerIcon.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-
-    // Render working placeholders inside popup card
-    resultsList.innerHTML = mobiles.map(mob => {
-        const acc = state.sessions.find(s => String(s.mobile || s.phone) === String(mob));
-        const name = acc ? acc.name || 'User' : 'User';
-        return `
-        <div id="prog_row_${mob}" class="tools-account-checkbox-item" style="padding:10px 12px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <i class="fa-solid fa-spinner fa-spin" style="color:var(--swiggy-blue); font-size:14px;"></i>
-                <div>
-                    <div style="font-family:var(--font-heading); font-size:13px; font-weight:700; color:var(--text-main);">
-                        +91 ${mob} <span style="font-size:11px; font-weight:500; color:var(--text-muted); margin-left:4px;">(${name})</span>
-                    </div>
-                </div>
-            </div>
-            <span class="prog-tag" style="font-size:10px; font-weight:700; background:rgba(252,128,25,0.15); color:var(--swiggy-blue); padding:2px 8px; border-radius:10px;">
-                Working...
-            </span>
-        </div>`;
-    }).join('');
-
-    progressModal.style.display = 'flex';
-
-    try {
-        const res = await fetch('/api/tools/batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: actionName,
-                mobiles: mobiles,
-                slot: toolsState.selectedSlot
-            })
-        });
-
-        const data = await res.json();
-        if (barFill) barFill.style.width = '100%';
-
-        if (data.success && data.results) {
-            let successCount = 0;
-            let failCount = 0;
-
-            data.results.forEach(item => {
-                const mob = String(item.mobile || '');
-                const msg = item.message || '';
-                const row = document.getElementById(`prog_row_${mob}`);
-                
-                if (item.success) {
-                    successCount++;
-                } else {
-                    failCount++;
-                }
-
-                if (row) {
-                    const iconEl = row.querySelector('i');
-                    const tagEl = row.querySelector('.prog-tag');
-                    if (iconEl) {
-                        iconEl.className = item.success ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark';
-                        iconEl.style.color = item.success ? '#10b981' : '#ef4444';
-                    }
-                    if (tagEl) {
-                        tagEl.innerText = item.success ? 'Success' : 'Failed';
-                        tagEl.style.background = item.success ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
-                        tagEl.style.color = item.success ? '#10b981' : '#ef4444';
-                    }
-                    const detail = document.createElement('div');
-                    detail.style.fontSize = '11px';
-                    detail.style.color = item.success ? '#10b981' : '#ef4444';
-                    detail.style.marginTop = '2px';
-                    detail.innerText = msg;
-                    const textWrap = row.querySelector('div > div');
-                    if (textWrap) textWrap.appendChild(detail);
-                }
-            });
-
-            if (subEl) subEl.innerText = `Finished! Success: ${successCount} | Failed: ${failCount}`;
-            if (headerIcon) headerIcon.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#10b981;"></i>`;
-            if (doneBtn) doneBtn.style.display = 'flex';
-            if (closeBtn) closeBtn.style.display = 'block';
-
-            showToast(`${title} finished! (${successCount} OK, ${failCount} Fail)`, failCount > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check');
-
-            if (actionName === 'check_alive' || actionName === 'delete_addresses') {
-                await loadSavedSessions();
-            }
-        } else {
-            if (subEl) subEl.innerText = `Error: ${data.detail || data.error || 'Execution failed'}`;
-            if (headerIcon) headerIcon.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i>`;
-            if (doneBtn) doneBtn.style.display = 'flex';
-            if (closeBtn) closeBtn.style.display = 'block';
-        }
-    } catch (err) {
-        if (barFill) barFill.style.width = '100%';
-        if (subEl) subEl.innerText = `Network error: ${err.message}`;
-        if (headerIcon) headerIcon.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i>`;
-        if (doneBtn) doneBtn.style.display = 'flex';
-        if (closeBtn) closeBtn.style.display = 'block';
-    }
-}
-
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   ██  CART PAGE — Full Group Cart with Address, Bill, Coupons, Payments  ██
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-let cartState = {
-    selectedAddress: null,
-    groupCartId: '',
-    cartData: null,
-    billCollapsed: false,
-    addressId: '',
-};
-
-function renderCartView() {
-    const banner = document.getElementById('cartNoAccountBanner');
-    const content = document.getElementById('cartContent');
-    if (!banner || !content) return;
-
-    if (!state.activeSession) {
-        banner.style.display = 'flex';
-        content.style.display = 'none';
-        return;
-    }
-
-    banner.style.display = 'none';
-    content.style.display = 'block';
-
-    // Sync top address bar display
-    updateTopAddressBarUI();
-}
-
-/* ── ADDRESS SELECTOR MODAL ──────────────────────────── */
-
-function openCartAddressModal() {
-    const modal = document.getElementById('cartAddressModal');
-    if (modal) modal.style.display = 'flex';
-    loadCartAddressesModalList();
-}
-
-function closeCartAddressModal(e) {
-    if (e && e.target !== e.currentTarget) return;
-    const modal = document.getElementById('cartAddressModal');
-    if (modal) modal.style.display = 'none';
-}
-
-async function loadCartAddressesModalList() {
-    const container = document.getElementById('cartAddressSelectorList');
-    if (!container || !state.activeMobile) return;
-
-    container.innerHTML = '<div class="cart-loading-shimmer"><div class="shimmer-line w80"></div><div class="shimmer-line w60"></div></div>';
-
-    try {
-        const res = await fetch(`/api/addresses/${state.activeMobile}?force=false`);
-        const data = await res.json();
-        if (data.success) {
-            const allAddrs = data.addresses || [];
-            cartState._addresses = allAddrs;
-            if (allAddrs.length === 0) {
-                container.innerHTML = `<div class="cart-empty-addr"><i class="fa-solid fa-location-dot"></i> No saved addresses in database.</div>`;
-                return;
-            }
-
-            container.innerHTML = allAddrs.map((a, idx) => {
-                const isSelected = cartState.selectedAddress && (cartState.selectedAddress.id === a.id || (cartState.selectedAddress.address === a.address && cartState.selectedAddress.name === a.name));
-                const icon = a.is_global ? 'fa-globe' : 'fa-location-dot';
-                const tag = (a.annotation || a.label || (a.is_global ? 'GLOBAL' : 'ACCOUNT')).toUpperCase();
-                const globalBadge = a.is_global ? '<span class="cart-addr-global-badge">GLOBAL</span>' : '<span class="cart-addr-tag-pill account">ACCOUNT</span>';
-                const addr = a.formatted_address || a.address || a.house || 'Unknown Address';
-                const shortAddr = addr.length > 90 ? addr.substring(0, 90) + '...' : addr;
-                const nameStr = a.name || 'Recipient';
-                const phoneStr = a.phone ? ` | +91 ${a.phone}` : '';
-
-                return `
-                <div class="cart-addr-option ${isSelected ? 'selected' : ''}" onclick="selectCartAddressFromModal(${idx})">
-                    <div class="cart-addr-icon"><i class="fa-solid ${icon}"></i></div>
-                    <div class="cart-addr-body">
-                        <div class="cart-addr-tag-row">
-                            <span class="cart-addr-tag">${tag}</span>
-                            ${globalBadge}
-                            ${isSelected ? '<span class="coupon-applied-tag" style="margin-left:auto;"><i class="fa-solid fa-check"></i> Selected</span>' : ''}
-                        </div>
-                        <div class="cart-addr-name" style="margin-top:2px;">${nameStr}${phoneStr}</div>
-                        <div class="cart-addr-text" style="margin-top:2px;">${shortAddr}</div>
-                    </div>
-                    <div class="cart-addr-radio"><span></span></div>
-                </div>`;
-            }).join('');
-        }
-    } catch (e) {
-        container.innerHTML = `<div class="cart-empty-addr"><i class="fa-solid fa-triangle-exclamation"></i> Error loading addresses</div>`;
-    }
-}
-
-async function selectCartAddressFromModal(idx) {
-    const allAddrs = cartState._addresses || [];
-    if (idx >= allAddrs.length) return;
-
-    const selected = { ...allAddrs[idx] };
-    closeCartAddressModal();
-
-    // Saved (database) addresses go onto the Swiggy account now; if it already has the same one, that copy is used.
-    if (selected.is_global) {
-        showToast('Adding address to account...', false, 1500);
-        const onAccount = await addGlobalAddressToAccount(selected);
-        if (!onAccount) return;  // toast already shown
-        selected.account_id = onAccount.id;
-    } else {
-        selected.account_id = selected.id;
-    }
-
-    cartState.selectedAddress = selected;
-    updateTopAddressBarUI();
-    showToast(`Address selected: ${selected.annotation || selected.label || 'Home'}`);
-
-    // If group cart link is already filled, automatically fetch cart with new address
-    const input = document.getElementById('cartGroupLinkInput');
-    if (input && input.value.trim()) {
-        handleFetchGroupCart();
-    }
-}
-
-function updateTopAddressBarUI() {
-    const a = cartState.selectedAddress;
-    const titleEl = document.getElementById('cartTopAddrTitle');
-    const subEl = document.getElementById('cartTopAddrSub');
-
-    if (!a) {
-        if (titleEl) titleEl.textContent = 'Select Delivery Address';
-        if (subEl) subEl.textContent = 'Tap to select saved address from database';
-        return;
-    }
-
-    const tag = a.annotation || a.label || (a.is_global ? 'Global' : 'Account');
-    if (titleEl) titleEl.innerHTML = `${tag} <span style="font-size:11.5px; font-weight:600; color:var(--text-muted); margin-left:6px;">${a.name ? a.name : ''}</span>`;
-    if (subEl) {
-        const addr = a.formatted_address || a.address || a.house || '';
-        subEl.textContent = addr.length > 80 ? addr.substring(0, 80) + '...' : addr;
-    }
-}
-
-function openAddAddressFromCart() {
-    closeCartAddressModal();
-    switchTab('address');
-}
-
-async function addGlobalAddressToAccount(addr) {
-    if (!state.activeMobile || !addr) return null;
-    try {
-        const res = await fetch('/api/cart/add_address_to_account', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: state.activeMobile, address: addr })
-        });
-        const data = await res.json();
-        if (data.success && data.address) return data.address;
-        showToast(data.error || 'Could not add address to account', true, 2500);
-    } catch (e) {
-        showToast('Network error while adding address', true, 2500);
-    }
-    return null;
-}
-
-/* ── GROUP CART FETCH ─────────────────────────────────── */
-
-function extractGroupCartId(input) {
-    if (!input) return '';
-    input = input.trim();
-    
-    // 1. Swiggy shortlink pattern: swig.gy/gc/<rest_id>/<host_name>-<group_cart_id>
-    const m1 = input.match(/swig\.gy\/gc\/\d+\/[^\/]+-(\d+)/i);
-    if (m1) return m1[1];
-
-    // 2. Query param group_cart_id=(\d+)
-    const m2 = input.match(/group_cart_id=(\d+)/i);
-    if (m2) return m2[1];
-
-    // 3. Pure digits
-    if (/^\d+$/.test(input)) return input;
-
-    // 4. Fallback to number after last hyphen
-    const m3 = input.match(/-(\d+)(?:\/?|\?.*)$/);
-    if (m3) return m3[1];
-
-    // 5. Generic fallback regex for min 6 digits
-    const m4 = input.match(/(\d{6,})/);
-    if (m4) return m4[1];
-
-    return input;
-}
-
-async function handleFetchGroupCart() {
-    const input = document.getElementById('cartGroupLinkInput');
-    if (!input) return;
-    const raw = input.value.trim();
-    if (!raw) {
-        showToast('Enter a group cart ID or link', true);
-        return;
-    }
-
-    const groupCartId = extractGroupCartId(raw);
-    if (!groupCartId) {
-        showToast('Invalid cart ID / link', true);
-        return;
-    }
-
-    cartState.groupCartId = groupCartId;
-
-    const btn = document.getElementById('cartFetchBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching Cart...';
-    }
-
-    showToast('Fetching cart data from Swiggy...');
-
-    try {
-        const addr = cartState.selectedAddress || {};
-        const res = await fetch('/api/cart/fetch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mobile: state.activeMobile,
-                group_cart_id: raw, // Pass raw link so backend can also resolve swig.gy if needed
-                address_id: addr.account_id || addr.id || '',
-                lat: addr.lat || null,
-                lng: addr.lng || null,
-            })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            cartState.cartData = data;
-            renderFullCartData(data);
-            showToast('Cart loaded successfully!');
-
-            // Also fetch payment options
-            fetchCartPaymentOptions();
-        } else {
-            const rawErr = formatRawServerError(data, 'Failed to fetch group cart');
-            showToast(`${rawErr}`, true, 4000);
-            renderCartErrorCard(rawErr, data);
-        }
-    } catch (e) {
-        const netErr = `Network / server error: ${e.message || e}`;
-        showToast(`${netErr}`, true, 4000);
-        renderCartErrorCard(netErr, { error: netErr });
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Fetch Cart Data';
-        }
-    }
-}
-
-function renderCartErrorCard(errorText, rawData) {
-    const step3 = document.getElementById('cartStep3');
-    if (!step3) return;
-    step3.style.display = 'block';
-
-    const rawDisplay = typeof rawData === 'object' ? JSON.stringify(rawData, null, 2) : String(rawData || errorText);
-
-    step3.innerHTML = `
-        <div class="card" style="padding:16px; border:2px solid #ef4444; background:rgba(239,68,68,0.06); border-radius:16px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; gap:10px; color:#ef4444; font-family:var(--font-heading); font-size:14px; font-weight:800; margin-bottom:8px;">
-                <i class="fa-solid fa-circle-xmark" style="font-size:18px;"></i> Swiggy Server Raw Error Response
-            </div>
-            <div style="font-size:13px; color:var(--text-main); font-weight:600; margin-bottom:8px;">
-                ${errorText}
-            </div>
-            <div style="font-size:11px; color:var(--text-muted); font-family:monospace; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; white-space:pre-wrap; word-break:break-all; max-height:220px; overflow-y:auto;">
-${rawDisplay}
-            </div>
-        </div>`;
-}
-
-/* ── RENDER FULL CART DATA ────────────────────────────── */
-
-function renderFullCartData(data) {
-    // Show step 3
-    document.getElementById('cartStep3').style.display = 'block';
-    // Optionally collapse step 2
-    document.getElementById('cartStep2').querySelector('.cart-link-input-wrap').style.display = 'none';
-
-    // Restaurant
-    renderRestaurantCard(data.restaurant || {});
-
-    // Savings banner
-    renderSavingsBanner(data.savings_info || {});
-
-    // Swiggy One
-    renderSwiggyOneCard(data.swiggy_one || {});
-
-    // Couponless savings
-    renderCouponlessBanner(data.couponless_savings || {});
-
-    // Items
-    renderCartItems(data.items || [], data.item_count || 0);
-
-    // Coupon info
-    renderCouponInfo(data.coupon_info || {});
-
-    // Bill
-    renderBillDetails(data.bill || {});
-}
-
-function renderRestaurantCard(rest) {
-    const nameEl = document.getElementById('cartRestName');
-    const metaEl = document.getElementById('cartRestMeta');
-    const ratingBox = document.getElementById('cartRestRating');
-    const ratingVal = document.getElementById('cartRestRatingVal');
-
-    if (nameEl) nameEl.textContent = rest.name || 'Restaurant';
-    
-    const metaParts = [];
-    if (rest.area) metaParts.push(rest.area);
-    if (rest.delivery_time) metaParts.push(`${rest.delivery_time} min`);
-    if (rest.cuisines && rest.cuisines.length) metaParts.push(rest.cuisines.slice(0, 3).join(', '));
-    if (metaEl) metaEl.textContent = metaParts.join(' · ') || 'Food delivery';
-
-    if (rest.rating && ratingBox && ratingVal) {
-        ratingBox.style.display = 'flex';
-        ratingVal.textContent = rest.rating;
-    }
-}
-
-function renderSavingsBanner(savings) {
-    const banner = document.getElementById('cartSavingsBanner');
-    const text = document.getElementById('cartSavingsText');
-    if (!banner) return;
-
-    if (savings.savings_message || savings.total_savings > 0) {
-        banner.style.display = 'flex';
-        if (text) text.textContent = savings.savings_message || `₹${savings.total_savings} saved on this order!`;
-    } else {
-        banner.style.display = 'none';
-    }
-}
-
-function renderSwiggyOneCard(one) {
-    const card = document.getElementById('cartOneCard');
-    const benefitsList = document.getElementById('cartOneBenefitsList');
-    const label = document.getElementById('cartOneBenefitsLabel');
-    if (!card) return;
-
-    if (one.is_super && one.benefits && one.benefits.length > 0) {
-        card.style.display = 'block';
-        if (label) label.textContent = one.logo_text || 'BENEFITS';
-        if (benefitsList) {
-            benefitsList.innerHTML = one.benefits.map(b => `
-                <div class="one-benefit-item">
-                    <i class="fa-solid fa-check-circle"></i>
-                    <span>${b.title || b.sub_title || ''}</span>
-                </div>
-            `).join('');
-        }
-    } else {
-        card.style.display = 'none';
-    }
-}
-
-function renderCouponlessBanner(cl) {
-    const banner = document.getElementById('cartCouponlessBanner');
-    if (!banner) return;
-    if (cl.savings || cl.benefit_callout) {
-        banner.style.display = 'flex';
-        const savEl = document.getElementById('cartCouponlessSavings');
-        const callEl = document.getElementById('cartCouponlessCallout');
-        if (savEl) savEl.textContent = cl.savings || '';
-        if (callEl) callEl.textContent = cl.benefit_callout || '';
-    } else {
-        banner.style.display = 'none';
-    }
-}
-
-function renderCartItems(items, count) {
-    const listEl = document.getElementById('cartItemsList');
-    const countPill = document.getElementById('cartItemsCountPill');
-    if (countPill) countPill.textContent = count || items.length;
-
-    if (!listEl) return;
-    if (!items.length) {
-        listEl.innerHTML = '<div class="cart-empty-items">No items in cart</div>';
-        return;
-    }
-
-    listEl.innerHTML = items.map(item => {
-        const vegIcon = item.is_veg
-            ? '<div class="veg-icon veg"><div></div></div>'
-            : '<div class="veg-icon nonveg"><div></div></div>';
-        
-        const rawPrice = item.effective_price || item.price || 0;
-        const rawMrp = item.mrp || 0;
-        const pricePerItem = Number(rawPrice > 1000 ? rawPrice / 100 : rawPrice).toFixed(0);
-        const mrpPerItem = Number(rawMrp > 1000 ? rawMrp / 100 : rawMrp).toFixed(0);
-        const showStrike = Number(mrpPerItem) > Number(pricePerItem) && Number(mrpPerItem) > 0;
-        const qty = item.quantity || 1;
-        const totalDisplay = (Number(pricePerItem) * qty).toFixed(0);
-
-        const imgHtml = item.image ? `<img src="${item.image}" alt="${item.name}" class="cart-item-img" onerror="this.style.display='none'">` : '';
-
-        return `
-        <div class="cart-item-card">
-            <div class="cart-item-left">
-                ${vegIcon}
-                <div class="cart-item-info">
-                    <div class="cart-item-name">${item.name}</div>
-                    <div class="cart-item-price-row">
-                        ${showStrike ? `<span class="cart-item-mrp">₹${mrpPerItem}</span>` : ''}
-                        <span class="cart-item-price">₹${pricePerItem}</span>
-                        <span class="cart-item-qty">× ${qty}</span>
-                    </div>
-                    ${item.ribbon ? `<span class="cart-item-ribbon">${item.ribbon}</span>` : ''}
-                    ${item.description ? `<div class="cart-item-desc">${item.description.substring(0, 80)}</div>` : ''}
-                </div>
-            </div>
-            <div class="cart-item-right">
-                ${imgHtml}
-                <div class="cart-item-total">₹${totalDisplay}</div>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function renderCouponInfo(coupon) {
-    const titleEl = document.getElementById('cartCouponTitle');
-    const subEl = document.getElementById('cartCouponSub');
-    if (!titleEl) return;
-
-    if (coupon.coupon_code) {
-        titleEl.textContent = `Coupon Applied: ${coupon.coupon_code}`;
-        subEl.textContent = coupon.coupon_discount > 0 ? `You saved ₹${coupon.coupon_discount}` : 'Coupon applied';
-    } else if (coupon.show_couponless_savings && coupon.couponless_savings) {
-        titleEl.textContent = 'Apply Coupon';
-        subEl.textContent = coupon.couponless_savings.savings ? `Extra ${coupon.couponless_savings.savings} available` : 'Save more on your order';
-    }
-}
-
-function renderBillDetails(bill) {
-    // Item Total
-    const itemTotal = bill.cart_subtotal || bill.item_total || 0;
-    const itemTotalStrike = bill.item_total_strike || bill.item_total || 0;
-    setInner('billItemTotal', `₹${(itemTotal / 100).toFixed(0)}`);
-    
-    if (bill.item_total_strike_off && itemTotalStrike > itemTotal) {
-        setInner('billItemTotalStrike', `₹${(itemTotalStrike / 100).toFixed(0)}`);
-    } else if (itemTotalStrike > 0 && itemTotalStrike !== itemTotal) {
-        setInner('billItemTotalStrike', `₹${(itemTotalStrike / 100).toFixed(0)}`);
-    }
-
-    // Trade/Offer Discount
-    if (bill.trade_discount > 0) {
-        showEl('billRowTradeDiscount');
-        setInner('billTradeDiscount', `-₹${bill.trade_discount}`);
-    }
-
-    // Coupon Discount
-    if (bill.coupon_discount > 0) {
-        showEl('billRowCouponDiscount');
-        setInner('billCouponDiscount', `-₹${bill.coupon_discount}`);
-    }
-
-    // Delivery Fee
-    const deliveryCharges = bill.delivery_charges || 0;
-    const deliveryBase = bill.delivery_base_price || 0;
-    if (deliveryCharges === 0 && deliveryBase > 0) {
-        setInner('billDeliveryFee', 'FREE');
-        document.getElementById('billDeliveryFee').classList.add('green');
-        setInner('billDeliveryStrike', `₹${deliveryBase}`);
-    } else if (deliveryCharges > 0) {
-        setInner('billDeliveryFee', `₹${deliveryCharges}`);
-    } else {
-        setInner('billDeliveryFee', 'FREE');
-        document.getElementById('billDeliveryFee').classList.add('green');
-    }
-
-    // Delivery tooltip
-    if (bill.delivery_tooltip && bill.delivery_tooltip.length > 0) {
-        const tooltipEl = document.getElementById('billDeliveryTooltip');
-        if (tooltipEl) {
-            tooltipEl.innerHTML = bill.delivery_tooltip.map(t => {
-                if (t.type === 'title') return `<div class="dt-title">${t.display_text || ''}</div>`;
-                const valColor = (t.meta && t.meta.valueTextColor) || '';
-                const strike = (t.meta && t.meta.intermediateTextStriked && t.intermediateText) ? `<span class="dt-strike">${t.intermediateText}</span>` : '';
-                return `<div class="dt-row"><span>${t.display_text || ''}</span><div>${strike} <span style="color:${valColor || 'inherit'}">${t.value || ''}</span></div></div>`;
-            }).join('');
-        }
-    }
-
-    // Free Delivery Savings
-    if (bill.free_delivery_discount > 0) {
-        showEl('billRowFreeDelivery');
-        setInner('billFreeDelivery', `-₹${bill.free_delivery_discount}`);
-    }
-
-    // Platform/Convenience Fee
-    if (bill.convenience_fees > 0) {
-        showEl('billRowConvenience');
-        setInner('billConvenience', `₹${bill.convenience_fees.toFixed(2)}`);
-    }
-
-    // Packing Charges
-    if (bill.packing_charges > 0) {
-        showEl('billRowPacking');
-        setInner('billPacking', `₹${bill.packing_charges}`);
-    }
-
-    // GST
-    const gstTitle = bill.gst_title || 'GST & Other Charges';
-    setInner('billGSTLabel', gstTitle);
-    const taxAmount = bill.taxes_and_charges || bill.total_tax || 0;
-    setInner('billGST', `₹${taxAmount.toFixed(2)}`);
-
-    // GST Tooltip
-    if (bill.gst_details && Object.keys(bill.gst_details).length > 0) {
-        const gstEl = document.getElementById('billGSTTooltip');
-        if (gstEl) {
-            const gd = bill.gst_details;
-            let rows = '';
-            if (gd.item_SGST > 0) rows += `<div class="dt-row"><span>Item SGST</span><span>₹${gd.item_SGST.toFixed(2)}</span></div>`;
-            if (gd.item_CGST > 0) rows += `<div class="dt-row"><span>Item CGST</span><span>₹${gd.item_CGST.toFixed(2)}</span></div>`;
-            if (gd.item_IGST > 0) rows += `<div class="dt-row"><span>Item IGST</span><span>₹${gd.item_IGST.toFixed(2)}</span></div>`;
-            if (gd.packaging_SGST > 0) rows += `<div class="dt-row"><span>Packaging SGST</span><span>₹${gd.packaging_SGST.toFixed(2)}</span></div>`;
-            if (gd.packaging_CGST > 0) rows += `<div class="dt-row"><span>Packaging CGST</span><span>₹${gd.packaging_CGST.toFixed(2)}</span></div>`;
-            if (gd.service_charge_SGST > 0) rows += `<div class="dt-row"><span>Service SGST</span><span>₹${gd.service_charge_SGST.toFixed(2)}</span></div>`;
-            if (gd.service_charge_CGST > 0) rows += `<div class="dt-row"><span>Service CGST</span><span>₹${gd.service_charge_CGST.toFixed(2)}</span></div>`;
-            gstEl.innerHTML = rows || '<div class="dt-row"><span>Tax details not available</span></div>';
-        }
-    }
-
-    // Swiggy Money / Free Cash
-    if (bill.swiggy_money > 0) {
-        showEl('billRowSwiggyMoney');
-        setInner('billSwiggyMoney', `-₹${bill.swiggy_money}`);
-    }
-
-    // TO PAY
-    const toPay = bill.order_total || bill.cart_total || 0;
-    setInner('billToPay', `₹${toPay}`);
-
-    // Collapsed bill
-    const collapsed = bill.collapsed || {};
-    setInner('billCollapsedAmount', `₹${collapsed.totalAmount || toPay}`);
-    setInner('billCollapsedSub', collapsed.subtitle || 'Incl. all taxes & charges');
-    if (collapsed.strikeoffAmount && collapsed.strikeoffAmount > 0) {
-        setInner('billCollapsedStrike', `₹${collapsed.strikeoffAmount}`);
-    }
-    
-    // Discount message
-    if (bill.discount_message) {
-        const savBanner = document.getElementById('cartSavingsBanner');
-        const savText = document.getElementById('cartSavingsText');
-        if (savBanner && savText) {
-            savBanner.style.display = 'flex';
-            savText.textContent = bill.discount_message;
-        }
-    }
-}
-
-function setInner(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-}
-
-function showEl(id) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'flex';
-}
-
-function toggleBillCollapse() {
-    cartState.billCollapsed = !cartState.billCollapsed;
-    const body = document.getElementById('cartBillBody');
-    const collapsed = document.getElementById('cartBillCollapsed');
-    const icon = document.getElementById('billCollapseIcon');
-
-    if (cartState.billCollapsed) {
-        if (body) body.style.display = 'none';
-        if (collapsed) collapsed.style.display = 'flex';
-        if (icon) icon.style.transform = 'rotate(180deg)';
-    } else {
-        if (body) body.style.display = 'block';
-        if (collapsed) collapsed.style.display = 'none';
-        if (icon) icon.style.transform = 'rotate(0deg)';
-    }
-}
-
-function toggleDeliveryTooltip() {
-    const el = document.getElementById('billDeliveryTooltip');
-    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-function toggleGSTTooltip() {
-    const el = document.getElementById('billGSTTooltip');
-    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-
-/* ── PAYMENT OPTIONS ──────────────────────────────────── */
-
-async function fetchCartPaymentOptions() {
-    const section = document.getElementById('cartPaymentSection');
-    if (!section || !state.activeMobile || !cartState.groupCartId) return;
-
-    try {
-        const addr = cartState.selectedAddress || {};
-        const res = await fetch('/api/cart/payment_options', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mobile: state.activeMobile,
-                group_cart_id: cartState.groupCartId,
-                address_id: addr.account_id || addr.id || '',
-                lat: addr.lat || null,
-                lng: addr.lng || null,
-            })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            section.style.display = 'block';
-            renderPaymentGroups(data.payment_groups || []);
-        }
-    } catch (e) {
-        console.log('Payment options error:', e);
-    }
-}
-
-function renderPaymentGroups(groups) {
-    const listEl = document.getElementById('cartPaymentGroupsList');
-    if (!listEl) return;
-
-    listEl.innerHTML = groups.map(group => {
-        if (!group.methods || group.methods.length === 0) return '';
-        
-        const methodsHtml = group.methods.map(m => {
-            const icon = m.icon ? `<img src="${m.icon}" alt="${m.name}" class="pm-icon" onerror="this.style.display='none'">` : `<div class="pm-icon-fallback"><i class="fa-solid fa-credit-card"></i></div>`;
-            const statusClass = m.enabled ? '' : 'disabled';
-            const codBadge = m.is_cod ? '<span class="pm-badge cod">COD</span>' : '';
-            const upiBadge = m.is_upi_intent ? '<span class="pm-badge upi">UPI</span>' : '';
-            const balanceHtml = m.balance ? `<span class="pm-balance">₹${parseFloat(m.balance).toFixed(2)}</span>` : '';
-            const linkedBadge = m.is_linked ? '<span class="pm-linked-badge"><i class="fa-solid fa-link"></i></span>' : '';
-            const promoHtml = m.promo_msg ? `<div class="pm-promo">${m.promo_msg}</div>` : '';
-            const preferredStar = m.preferred ? '<i class="fa-solid fa-star pm-pref-star"></i>' : '';
-
-            return `
-            <div class="pm-method ${statusClass}">
-                <div class="pm-left">
-                    ${icon}
-                    <div class="pm-details">
-                        <div class="pm-name">${m.name} ${preferredStar} ${codBadge} ${upiBadge} ${linkedBadge}</div>
-                        ${m.amount ? `<div class="pm-amount">₹${m.amount}</div>` : ''}
-                        ${balanceHtml ? `<div class="pm-amount">${balanceHtml}</div>` : ''}
-                        ${promoHtml}
-                        ${!m.enabled ? `<div class="pm-disabled-msg">${m.disable_message || 'Not available'}</div>` : ''}
-                    </div>
-                </div>
-                ${m.enabled ? '<div class="pm-radio"><span></span></div>' : ''}
-            </div>`;
-        }).join('');
-
-        return `
-        <div class="pm-group">
-            <div class="pm-group-header">
-                <span class="pm-group-name">${group.display_name || group.name}</span>
-                ${group.is_preferred ? '<span class="pm-pref-tag">Preferred</span>' : ''}
-            </div>
-            ${methodsHtml}
-        </div>`;
-    }).join('');
-}
-
-/* ── COUPON MODAL ─────────────────────────────────────── */
-
-function openCouponModal() {
-    document.getElementById('cartCouponModal').style.display = 'flex';
-    // Fetch coupons
-    fetchAvailableCoupons();
-}
-
-function closeCouponModal(e) {
-    if (e && e.target !== e.currentTarget) return;
-    document.getElementById('cartCouponModal').style.display = 'none';
-}
-
-async function fetchAvailableCoupons() {
-    const listEl = document.getElementById('couponAvailableList');
-    if (!listEl || !state.activeMobile) return;
-
-    listEl.innerHTML = '<div class="coupon-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading coupons...</div>';
-
-    try {
-        const addr = cartState.selectedAddress || {};
-        const res = await fetch('/api/cart/coupons', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mobile: state.activeMobile,
-                group_cart_id: cartState.groupCartId || '',
-                lat: addr.lat || null,
-                lng: addr.lng || null,
-            })
-        });
-        const data = await res.json();
-
-        if (data.success && data.coupons && data.coupons.length > 0) {
-            listEl.innerHTML = '<div class="coupon-list-title">Available Coupons</div>' + data.coupons.map(c => `
-                <div class="coupon-card-item" onclick="applyCouponFromList('${c.code}')">
-                    <div class="coupon-card-code">${c.code}</div>
-                    <div class="coupon-card-desc">${c.title || c.description || ''}</div>
-                    ${c.max_discount ? `<div class="coupon-card-max">Max discount: ₹${c.max_discount}</div>` : ''}
-                    <button class="coupon-apply-btn">APPLY</button>
-                </div>
-            `).join('');
-        } else {
-            listEl.innerHTML = '<div class="coupon-empty">No coupons available for this cart</div>';
-        }
-    } catch (e) {
-        listEl.innerHTML = '<div class="coupon-empty">Error loading coupons</div>';
-    }
-}
-
-function applyCouponFromList(code) {
-    const input = document.getElementById('couponCodeInput');
-    if (input) input.value = code;
-    handleApplyCoupon();
-}
-
-async function handleApplyCoupon() {
-    const input = document.getElementById('couponCodeInput');
-    const resultEl = document.getElementById('couponResultMsg');
-    if (!input) return;
-    const code = input.value.trim().toUpperCase();
-    if (!code) {
-        showToast('Enter a coupon code', true);
-        return;
-    }
-
-    showToast('Applying coupon...');
-
-    try {
-        const addr = cartState.selectedAddress || {};
-        const res = await fetch('/api/cart/apply_coupon', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mobile: state.activeMobile,
-                coupon_code: code,
-                group_cart_id: cartState.groupCartId || '',
-                address_id: addr.account_id || addr.id || '',
-                lat: addr.lat || null,
-                lng: addr.lng || null,
-            })
-        });
-        const data = await res.json();
-
-        if (resultEl) {
-            resultEl.style.display = 'block';
-            if (data.success) {
-                resultEl.className = 'coupon-result-msg success';
-                resultEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message || 'Coupon applied!'} ${data.discount ? `(₹${data.discount} off)` : ''}`;
-                showToast('Coupon applied!');
-                
-                // Re-fetch cart to update bill
-                setTimeout(() => {
-                    closeCouponModal();
-                    handleFetchGroupCart();
-                }, 1500);
-            } else {
-                resultEl.className = 'coupon-result-msg error';
-                resultEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.error || data.message || 'Failed to apply coupon'}`;
-                showToast(data.error || 'Coupon failed', true);
-            }
-        }
-    } catch (e) {
-        if (resultEl) {
-            resultEl.style.display = 'block';
-            resultEl.className = 'coupon-result-msg error';
-            resultEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Network error applying coupon';
-        }
-        showToast('Error applying coupon', true);
-    }
 }
